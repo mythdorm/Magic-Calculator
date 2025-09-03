@@ -1,0 +1,24 @@
+:root {
+  --power: rgb(247, 118, 118);
+}
+/* .center {
+  margin: auto;
+} */
+body {
+  text-align: center;
+}
+div {
+  text-align: center;
+}
+.tokens {
+  border: 1px solid;
+}
+.token1 {
+  margin: 0px auto;
+  float: none;
+  width: 70px;
+}
+table, th, td {
+  width: 70px;
+  border: 1px solid;
+}
