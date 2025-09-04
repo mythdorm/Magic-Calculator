@@ -1,10 +1,15 @@
 const debug = true;
 
 class AttributeDrop {
-  constructor (area) {
+  constructor (area, parent, position) {
     this.area = area;
-    this.times = 0; 
+    this.parent = parent;
+    this.times = 0;
+    this.before = ""
+    this.position = position;
     
+    parent.dropdowns.push(this);
+
     const additionalAttributes = document.createElement("select");
     additionalAttributes.style = "width: 100px;";
     const attributesText = document.createElement("option");
@@ -32,15 +37,55 @@ class AttributeDrop {
     );
 
     this.dropdown = additionalAttributes;
+    this.parent.dropdownCount += 1;
   }
 
   checkAttribute(dropdown) {
     confirmInConsole("checking");
     if (dropdown.value != "Attributes") {
-      const newDrop = new AttributeDrop(this.area);
+      this.setAttributes(dropdown.value, true);
+      // this.parent.setAttribute(this.before, dropdown.value);
+    }
+    if (this.parent.dropdownCount < 6 && this.times == 1) {
+      const newDrop = new AttributeDrop(this.area, this.parent, this.position + 1);
       newDrop.attachToParent(this.area);
     }
+    if (this.before != "Attributes" && this.before != "") {
+      confirmInConsole("set false");
+      this.setAttributes(this.before, false);
+    }
     this.times += 1;
+    this.before = dropdown.value;
+  }
+
+  setAttributes(value, change) {
+    switch (value) {
+        case "Deathtouch":
+          confirmInConsole("setting " + value + " set true");
+          this.parent.deathtouch = change;
+          break;
+        case "Indestructible":
+          confirmInConsole("setting " + value + " set true");
+          this.parent.indestructible = change;
+          break;
+        case "Double Strike":
+          confirmInConsole("setting " + value + " set true");
+          this.parent.doubleStrike = change;
+          break;
+        case "Vigilance":
+          confirmInConsole("setting " + value + " set true");
+          this.parent.vigilance = change;
+          break;
+        case "Flying":
+          confirmInConsole("setting " + value + " set true");
+          this.parent.flying = change;
+          break;
+        case "Reach":
+          confirmInConsole("setting " + value + " set true");
+          this.parent.reach = change;
+          break;
+    }
+    confirmInConsole("next");
   }
 
   getDrop () {
@@ -56,6 +101,20 @@ class Token {
   constructor (power, toughness) {
     this.power = power;
     this.toughness = toughness;
+
+    this.dropdownCount = 0;
+    this.dropdowns = [];
+
+    this.deathtouch = false;
+    this.indestructible = false;
+    this.doubleStrike = false;
+    this.vigilance = false;
+    this.flying = false;
+    this.reach = false;
+    // this.attributes = [];
+    // this.attributes = new Set(["Untapped"]);
+
+    this.tapped = false;
 
     const tokenArea = document.createElement("div");
     const attributeArea = document.createElement("div");
@@ -86,7 +145,7 @@ class Token {
     label.textContent = "Tapped";
 
     // additionalAttributes.type = "dropdown";
-    const additionalAttributes = new AttributeDrop(tokenArea);
+    const additionalAttributes = new AttributeDrop(tokenArea, this, 1);
     
 
     tokenArea.appendChild(powerNumber);
@@ -97,6 +156,10 @@ class Token {
     // attributeArea.appendChild(additionalAttributes);
     tokenArea.appendChild(attributeArea);
 
+    tappedBox.addEventListener("click", () => {
+      this.checkTapped(tappedBox.checked)
+    });
+
     additionalAttributes.attachToParent(attributeArea);
 
     tokenArea.className = "tokens"
@@ -105,7 +168,54 @@ class Token {
     confirmInConsole("token create");
   }
 
+  checkTapped (value) {
+    this.tapped = value;
+  }
 
+  setAttribute (position, value) {
+    if (position <= this.attributes.length) {
+      this.attributes[position] = value;
+    } else {
+      this.attributes.push(value);
+    }
+    // if (this.attributes.has(before)) {
+    //   this.attributes.delete(before);
+    // }
+    // this.attributes.add(value);
+  }
+
+  getAttributes () {
+    const attributes = [this.tapped, this.deathtouch, this.indestructible, this.doubleStrike, this.vigilance, this.flying, this.reach];
+    for (let value of this.dropdowns) {
+      switch (value) {
+        case "Deathtouch":
+          confirmInConsole("setting " + value + " set true");
+          this.deathtouch = change;
+          break;
+        case "Indestructible":
+          confirmInConsole("setting " + value + " set true");
+          this.indestructible = change;
+          break;
+        case "Double Strike":
+          confirmInConsole("setting " + value + " set true");
+          this.doubleStrike = change;
+          break;
+        case "Vigilance":
+          confirmInConsole("setting " + value + " set true");
+          this.vigilance = change;
+          break;
+        case "Flying":
+          confirmInConsole("setting " + value + " set true");
+          this.flying = change;
+          break;
+        case "Reach":
+          confirmInConsole("setting " + value + " set true");
+          this.reach = change;
+          break;
+      }
+    } 
+    return attributes;
+  }
 
   getToken() {
     return this.tokenArea;
@@ -117,8 +227,20 @@ class Token {
 }
 
 class Player {
-  constructor (playerId) {
+  constructor (playerId, playerDiv) {
     this.playerId = playerId;
+    this.health = 40;
+    this.tokens = [];
+
+    this.div = playerDiv;
+  }
+
+  setDiv (newDiv) {
+    this.div = newDiv;
+  }
+
+  getDiv () {
+    return this.div;
   }
 }
 
@@ -141,15 +263,16 @@ function confirmInConsole(message) {
 function createBlocker(playerNumber) {
 
   // Selects the creature area for the token to be attached to later
-  const player = document.getElementById("player" + playerNumber + "-creatures");
+  const playerCreatures = document.getElementById("player" + playerNumber + "-creatures");
 
   const token = new Token(1,1);
-  token.attachToParent(player);
+  token.attachToParent(playerCreatures);
+  players[playerNumber - 1].tokens.push(token);
   confirmInConsole("creature");
 }
 
 function attachBlockerListener(playerId) {
-  const player = players[playerId - 1];
+  const player = players[playerId - 1].getDiv();
   const id = player.id[6];
   blockerButton = document.getElementById("add-blocker" + id);
   blockerButton.addEventListener('click', () => {
@@ -162,11 +285,29 @@ function createCalculator() {
   const calculateDiv = document.getElementById("calculateDiv");
   const calculateButton = document.createElement("button");
   calculateButton.innerHTML = "CALCULATE";
+  calculateButton.addEventListener("click", calculate);
   calculateDiv.appendChild(calculateButton);
+}
+
+function calculate () {
+  let para = ""
+  for (let player of players) {
+    let sent = "" + player.playerId + ": "
+    for (let token of player.tokens) {
+      const tokenAttributes = token.getAttributes();
+      for (let attribute of tokenAttributes) {
+        sent += "" + attribute + " ";
+      }
+    }
+    para += sent + "\n"
+  }
+  window.alert(para);
 }
 
 function createPlayer() {
   confirmInConsole("player");
+
+  const player = new Player (totalPlayers);
 
   // Creates all the elements for the player area like the container, name, and additional child containers
   const playerDiv = document.createElement("div");
@@ -190,7 +331,7 @@ function createPlayer() {
   creatureArea.id = "player" + totalPlayers + "-creatures";
   creatureArea.style = "display:flex;justify-content: center;width: auto;";
   addBlockerButton.id = "add-blocker" + totalPlayers;
-  playerHealth.value = 40;
+  playerHealth.value = player.health;
 
   // playerDiv.style = "margin: 20px;";
   playerHealth.style = "text-align: center; width: 75px;";
@@ -205,7 +346,8 @@ function createPlayer() {
   playerDiv.appendChild(creatureArea);
   mainDiv.appendChild(playerDiv);
 
-  players.push(playerDiv);
+  player.setDiv(playerDiv);
+  players.push(player);
 
   attachBlockerListener(totalPlayers);
 
