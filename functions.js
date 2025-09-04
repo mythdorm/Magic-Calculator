@@ -335,7 +335,11 @@ function createPlayer() {
 
   // playerDiv.style = "margin: 20px;";
   playerHealth.style = "text-align: center; width: 75px;";
-  addBlockerButton.innerHTML = "Add Blocker";
+  if (totalPlayers == 1) {
+    addBlockerButton.innerHTML = "Add Attacker";
+  } else {
+    addBlockerButton.innerHTML = "Add Blocker";
+  }
   
   // Appends all the childs to their parent divs
   buttonArea.appendChild(addBlockerButton);
