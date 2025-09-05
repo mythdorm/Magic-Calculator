@@ -1,4 +1,8 @@
-const debug = true;
+let debug = true;
+
+function setDebug(value) {
+  debug = value;
+}
 
 class AttributeDrop {
   constructor (area, parent, position) {
@@ -165,6 +169,8 @@ class Token {
     tokenArea.className = "tokens"
 
     this.tokenArea = tokenArea;
+    this.powerWords = powerWords;
+    this.toughnessWords = toughnessWords;
     confirmInConsole("token create");
   }
 
@@ -185,7 +191,7 @@ class Token {
   }
 
   getAttributes () {
-    const attributes = [this.tapped, this.deathtouch, this.indestructible, this.doubleStrike, this.vigilance, this.flying, this.reach];
+    const attributes = [this.powerWords.value, this.toughnessWords.value, this.tapped, this.deathtouch, this.indestructible, this.doubleStrike, this.vigilance, this.flying, this.reach];
     for (let value of this.dropdowns) {
       switch (value) {
         case "Deathtouch":
@@ -244,6 +250,181 @@ class Player {
   }
 }
 
+class Battle {
+  constructor (firstPlayer, secondPlayer) {
+    this.tokensFirstPlayer = firstPlayer.tokens;
+    this.tokensSecondPlayer = secondPlayer.tokens;
+
+    let firstPlayerHealth = firstPlayer.health;
+    let firstPlayerHasFlying = false;
+    let firstPlayerHasReach = false;
+    let flyingCount = 0;
+    let flyingPositions = [];
+    let reachCount = 0;
+    let reachPositions = [];
+
+    let secondPlayerHealth = secondPlayer.health;
+    let secondPlayerHasFlying = false;
+    let secondPlayerHasReach = false;
+    let secondPlayerFlyingCount = 0;
+    // let secondPlayerFlyingPositons = [];
+    let secondPlayerReachCount = 0;
+    // let secondPlayerReachPositions = [];
+    let secondPlayerFlyingReachPositions = [];
+
+
+    for (let i = 0; i < tokensFirstPlayer.length; i++) {
+      if (tokensFirstPlayer[i].flying) {
+        firstPlayerHasFlying = true;
+        flyingCount += 1;
+        flyingPositions.push[i];
+      } else if (tokensFirstPlayer[1].reach) {
+        firstPlayerHasReach = true;
+        reachCount += 1;
+        reachPositions.push[i];
+      }
+    }
+
+    for (let i = 0; i < tokensSecondPlayer.length; i++) {
+      if (tokensSecondPlayer[i].flying) {
+        secondPlayerHasFlying = true;
+        secondPlayerFlyingCount += 1;
+        secondPlayerFlyingReachPositions.push[i];
+      } else if (tokensSecondPlayer[1].reach) {
+        secondPlayerHasReach = true;
+        secondPlayerReachCount += 1;
+        secondPlayerFlyingReachPositions.push[i];
+      }
+    }
+    if (flyingCount == (secondPlayerFlyingCount + secondPlayerReachCount)) {
+      
+    } else if (firstPlayerHasFlying && (secondPlayerHasFlying || secondPlayerHasReach)) {
+      for (let positionFlyer of flyingPositions) {
+        let flyerPower = this.tokensFirstPlayer[positionFlyer].powerWords.value;
+        let flyerToughness = this.tokensFirstPlayer[positionFlyer].toughnessWords.value;
+        for (let blockerPosition of secondPlayerFlyingReachPositions) {
+          let blockerPower = this.tokensSecondPlayer[blockerPosition].powerWords.value;
+          let blockerToughness = this.tokensSecondPlayer[blockerPosition].toughnessWords.value;
+          if (flyerPower > blockerToughness && (secondPlayerFlyingCount + secondPlayerReachCount) == 1) {
+            this.tokensSecondPlayer.splice(blockerPosition, 1);
+          }
+        }
+      } 
+    } else {
+      for (let position of flyingPositions) {
+        let damage = this.tokensFirstPlayer[position].powerWords.value
+        firstPlayerHealth -= damage;
+      }
+    }
+  }
+
+  combat(token1, token2) {
+    const token1Power = token1.powerWords.value;
+    const token1Toughness = token1.toughnessWords.value;
+    const token1Deathtouch = token1.deathtouch;
+    const token1Indestructible = token1.indestructible;
+    const token1DoubleStrike = token1.doubleStrike;
+    
+    const token2Power = token2.powerWords.value;
+    const token2Toughness = token2.toughnessWords.value;
+    const token2Deathtouch = token2.deathtouch;
+    const token2Indestructible = token2.indestructible;
+
+    // result 0: tokens tie and kill eachother
+    // result 1: token 1 wins
+    // result 2: token 2 wins
+    // result 3: token 1 wins with overkill
+    // result 4: neither token kills the other
+    // result 5: both tokens die, but token 1 does overkill
+    // result 6: token 1 dies, but still does overkill
+    // result 7: Neither die, but there is still overkill
+    //
+    let result = 0;
+
+    if (token1DoubleStrike) {
+      token1Power *= 2;
+    }
+
+    if (token1Deathtouch && token2Deathtouch) {
+      if (token1Indestructible && token2Indestructible) {
+        if (token1Power > token2Toughness) {
+          result = 7;
+        } else {
+          result = 4;
+        }
+      }else if (token2Indestructible) {
+        if (token1Power > token2Toughness) {
+          result = 6;
+        } else {
+          result = 2;
+        }
+      } else if (token1Indestructible) {
+        if (token1Power > token2Toughness) {
+          result = 3;
+        } else {
+          result = 1;
+        }
+      } else {
+        if (token1Power > token2Toughness) {
+          result = 5;
+        } else {
+          result = 4;
+        }
+      }
+    } else if (token1Deathtouch && token2Indestructible) {
+      if (token1Indestructible) {
+        if (token1Power > token2Toughness) {
+          result = 7;
+        } else {
+          result = 4;
+        }
+      } else if (token2Power < token1Toughness && token1Power < token2Toughness) {
+        result = 4;
+      } else {
+        if (token1Power > token2Toughness) {
+          result = 6; 
+        } else {
+          result = 2;
+        }
+      }
+    } else if (token1Indestructible && token2Deathtouch) {
+      if (token2Indestructible) {
+        if (token1Power > token2Toughness) {
+          result = 7;
+        } else {
+          result = 4;
+        }
+      } else if (token2Toughness > token1Power) {
+        result = 4;
+      } else {
+        if (token1Power > token2Toughness) {
+          result = 3;
+        } else {
+          result = 1;
+        }
+      }
+    } else if (token1Indestructible && token2Indestructible) {
+      if (token1Power > token2Toughness) {
+        result = 7;
+      } else {
+        result = 4;
+      }
+    } else {
+      if (token1Deathtouch) {
+        if (token1Indestructible) {
+
+        } else {
+          
+        }
+      } else if (token1Indestructible) {
+
+      } else {
+
+      }
+    }
+  }
+}
+
 playerButton = document.querySelector("#players");
 mainDiv = document.getElementById("main");
 mainDiv.style = "margin: 20px;";
@@ -257,8 +438,6 @@ function confirmInConsole(message) {
   }
   
 }
-
-
 
 function createBlocker(playerNumber) {
 
@@ -289,19 +468,60 @@ function createCalculator() {
   calculateDiv.appendChild(calculateButton);
 }
 
+function computeBattle (tokensFirstPlayer, tokensSecondPlayer) {
+  let copyFirstTokens = tokensFirstPlayer;
+  let copySecondTokens = tokensSecondPlayer;
+  // for (let token of copyFirstTokens) {
+  //   const tokenAttributes = token.getAttributes();
+  //   const tokenPower = tokenAttributes[0];
+  //   const tokenToughness = tokenAttributes[1];
+  //   const tokenTapped = tokenAttributes[2];
+  //   const tokenDeathtouch = token.deathtouch;
+  //   const tokenIndestructible = token.indestructible;
+  //   const tokenDoubleStrike = token.doubleStrike;
+  //   const tokenVigilance = token.vigilance;
+  //   const tokenFlying = token.flying;
+  //   const tokenReach = token.reach;
+  //   for (let token2 of copySecondTokens) {
+  //     const token2Attributes = token.getAttributes();
+  //     const token2Power = tokenAttributes[0];
+  //     const token2Toughness = tokenAttributes[1];
+  //     const token2Tapped = tokenAttributes[2];
+  //     const token2Deathtouch = token.deathtouch;
+  //     const token2Indestructible = token.indestructible;
+  //     const token2DoubleStrike = token.doubleStrike;
+  //     const token2Vigilance = token.vigilance;
+  //     const token2Flying = token.flying;
+  //     const token2Reach = token.reach;
+  //     if (tokenFlying && tokenReach) {
+
+  //     } else if (!tokenFlying) {
+
+  //     } else {
+
+  //     }
+  //   }
+  // }
+}
+
 function calculate () {
-  let para = ""
-  for (let player of players) {
-    let sent = "" + player.playerId + ": "
-    for (let token of player.tokens) {
-      const tokenAttributes = token.getAttributes();
-      for (let attribute of tokenAttributes) {
-        sent += "" + attribute + " ";
+  if (totalPlayers > 2 || debug) {
+    let para = ""
+    for (let player of players) {
+      let sent = "" + player.playerId + ": "
+      for (let token of player.tokens) {
+        const tokenAttributes = token.getAttributes();
+        for (let attribute of tokenAttributes) {
+          sent += "" + attribute + " ";
+        }
       }
+      para += sent + "\n"
     }
-    para += sent + "\n"
+    window.alert(para);
+  } else {
+    window.alert("There must be more than 1 player to calculate");
   }
-  window.alert(para);
+  
 }
 
 function createPlayer() {
