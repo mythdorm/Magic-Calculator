@@ -30,7 +30,9 @@ class AttributeDrop {
     flying.text = "Flying";
     const reach = document.createElement("option");
     reach.text = "Reach";
-    const attributes = [attributesText, deathtouch, indestructible, doubleStrike, vigilance, flying, reach];
+    const trample = document.createElement("option");
+    trample.text = "Trample";
+    const attributes = [attributesText, deathtouch, indestructible, doubleStrike, vigilance, flying, reach, trample];
 
     for (let attribute of attributes) {
       additionalAttributes.appendChild(attribute);
@@ -50,7 +52,7 @@ class AttributeDrop {
       this.setAttributes(dropdown.value, true);
       // this.parent.setAttribute(this.before, dropdown.value);
     }
-    if (this.parent.dropdownCount < 6 && this.times == 1) {
+    if (this.parent.dropdownCount < 7 && this.times == 1) {
       const newDrop = new AttributeDrop(this.area, this.parent, this.position + 1);
       newDrop.attachToParent(this.area);
     }
@@ -88,6 +90,10 @@ class AttributeDrop {
           confirmInConsole("setting " + value + " set true");
           this.parent.reach = change;
           break;
+        case "Trample":
+          confirmInConsole("setting " + value + " to true");
+          this.parent.trample = change;
+          break;
     }
     confirmInConsole("next");
   }
@@ -115,6 +121,7 @@ class Token {
     this.vigilance = false;
     this.flying = false;
     this.reach = false;
+    this.trample = false;
     // this.attributes = [];
     // this.attributes = new Set(["Untapped"]);
 
@@ -191,7 +198,7 @@ class Token {
   }
 
   getAttributes () {
-    const attributes = [this.powerWords.value, this.toughnessWords.value, this.tapped, this.deathtouch, this.indestructible, this.doubleStrike, this.vigilance, this.flying, this.reach];
+    const attributes = [this.powerWords.value, this.toughnessWords.value, this.tapped, this.deathtouch, this.indestructible, this.doubleStrike, this.vigilance, this.flying, this.reach, this.trample];
     for (let value of this.dropdowns) {
       switch (value) {
         case "Deathtouch":
@@ -217,6 +224,10 @@ class Token {
         case "Reach":
           confirmInConsole("setting " + value + " set true");
           this.reach = change;
+          break;
+        case "Trample":
+          confirmInConsole("setting " + value + " to true");
+          this.trample = change;
           break;
       }
     } 
@@ -278,7 +289,7 @@ class Battle {
         firstPlayerHasFlying = true;
         flyingCount += 1;
         flyingPositions.push[i];
-      } else if (tokensFirstPlayer[1].reach) {
+      } else if (tokensFirstPlayer[i].reach) {
         firstPlayerHasReach = true;
         reachCount += 1;
         reachPositions.push[i];
@@ -296,18 +307,28 @@ class Battle {
         secondPlayerFlyingReachPositions.push[i];
       }
     }
+
+    // TODO: This needs to be moved out into a seperate function
     if (flyingCount == (secondPlayerFlyingCount + secondPlayerReachCount)) {
       
     } else if (firstPlayerHasFlying && (secondPlayerHasFlying || secondPlayerHasReach)) {
       for (let positionFlyer of flyingPositions) {
-        let flyerPower = this.tokensFirstPlayer[positionFlyer].powerWords.value;
-        let flyerToughness = this.tokensFirstPlayer[positionFlyer].toughnessWords.value;
+        let lowestWeight = 100;
+        let positionLowestWeight = 0;
         for (let blockerPosition of secondPlayerFlyingReachPositions) {
-          let blockerPower = this.tokensSecondPlayer[blockerPosition].powerWords.value;
-          let blockerToughness = this.tokensSecondPlayer[blockerPosition].toughnessWords.value;
-          if (flyerPower > blockerToughness && (secondPlayerFlyingCount + secondPlayerReachCount) == 1) {
-            this.tokensSecondPlayer.splice(blockerPosition, 1);
+          let weight = this.simulate_combat(this.tokensFirstPlayer[positionFlyer], this.tokensSecondPlayer[blockerPosition])
+          if (weight < lowestWeight) {
+            lowestWeight = weight;
+            positionLowestWeight = blockerPosition;
           }
+        }
+        let combat_results = this.combat(this.tokensFirstPlayer[positionFlyer], this.tokensSecondPlayer[positionLowestWeight]);
+        secondPlayerHealth -= combat_results[0];
+        if (combat_results[1]) {
+          this.tokensFirstPlayer.splice(positionFlyer, 1);
+        }
+        if (combat_results[2]) {
+          this.tokensSecondPlayer.splice(positionLowestWeight, 1);
         }
       } 
     } else {
@@ -318,110 +339,85 @@ class Battle {
     }
   }
 
+  // Takes 2 tokens and outputs an array with a value for damage done to defense and two booleans for each token stating if it died
   combat(token1, token2) {
     const token1Power = token1.powerWords.value;
     const token1Toughness = token1.toughnessWords.value;
     const token1Deathtouch = token1.deathtouch;
     const token1Indestructible = token1.indestructible;
     const token1DoubleStrike = token1.doubleStrike;
+    const token1Trample = token1.trample;
     
     const token2Power = token2.powerWords.value;
     const token2Toughness = token2.toughnessWords.value;
     const token2Deathtouch = token2.deathtouch;
     const token2Indestructible = token2.indestructible;
 
-    // result 0: tokens tie and kill eachother
-    // result 1: token 1 wins
-    // result 2: token 2 wins
-    // result 3: token 1 wins with overkill
-    // result 4: neither token kills the other
-    // result 5: both tokens die, but token 1 does overkill
-    // result 6: token 1 dies, but still does overkill
-    // result 7: Neither die, but there is still overkill
-    //
-    let result = 0;
+    let damage = 0;
+    let token1Dead = false;
+    let token2Dead = false;
+
+    if (token1DoubleStrike) {
+      token1Power *= 2;
+    }
+    if (token1Trample && token1Power > token2Toughness) {
+      damage = token1Power - token2Toughness;
+    }
+    if (((token1Power >= token2Toughness) || token1Deathtouch) && !token2Indestructible) {
+      token2Dead = true;
+    }
+    if (((token2Power >= token1Toughness) || token2Deathtouch) && !token1Indestructible) {
+      token1Dead = true;
+    }
+    results = [damage, token1Dead, token2Dead];
+    return results;
+  }
+
+  simulate_combat(token1, token2) {
+    const token1Power = token1.powerWords.value;
+    const token1Toughness = token1.toughnessWords.value;
+    const token1Deathtouch = token1.deathtouch;
+    const token1Indestructible = token1.indestructible;
+    const token1DoubleStrike = token1.doubleStrike;
+    const token1Trample = token1.trample;
+    
+    const token2Power = token2.powerWords.value;
+    const token2Toughness = token2.toughnessWords.value;
+    const token2Deathtouch = token2.deathtouch;
+    const token2Indestructible = token2.indestructible;
+
+    // Weight determines how much of an impact the simulated combat would have on the defense
+    // The lower the weight, the lower the impact 
+    let weight = 0;
 
     if (token1DoubleStrike) {
       token1Power *= 2;
     }
 
-    if (token1Deathtouch && token2Deathtouch) {
-      if (token1Indestructible && token2Indestructible) {
-        if (token1Power > token2Toughness) {
-          result = 7;
-        } else {
-          result = 4;
-        }
-      }else if (token2Indestructible) {
-        if (token1Power > token2Toughness) {
-          result = 6;
-        } else {
-          result = 2;
-        }
-      } else if (token1Indestructible) {
-        if (token1Power > token2Toughness) {
-          result = 3;
-        } else {
-          result = 1;
-        }
-      } else {
-        if (token1Power > token2Toughness) {
-          result = 5;
-        } else {
-          result = 4;
-        }
-      }
-    } else if (token1Deathtouch && token2Indestructible) {
-      if (token1Indestructible) {
-        if (token1Power > token2Toughness) {
-          result = 7;
-        } else {
-          result = 4;
-        }
-      } else if (token2Power < token1Toughness && token1Power < token2Toughness) {
-        result = 4;
-      } else {
-        if (token1Power > token2Toughness) {
-          result = 6; 
-        } else {
-          result = 2;
-        }
-      }
-    } else if (token1Indestructible && token2Deathtouch) {
-      if (token2Indestructible) {
-        if (token1Power > token2Toughness) {
-          result = 7;
-        } else {
-          result = 4;
-        }
-      } else if (token2Toughness > token1Power) {
-        result = 4;
-      } else {
-        if (token1Power > token2Toughness) {
-          result = 3;
-        } else {
-          result = 1;
-        }
-      }
-    } else if (token1Indestructible && token2Indestructible) {
-      if (token1Power > token2Toughness) {
-        result = 7;
-      } else {
-        result = 4;
-      }
-    } else {
-      if (token1Deathtouch) {
-        if (token1Indestructible) {
-
-        } else {
-          
-        }
-      } else if (token1Indestructible) {
-
-      } else {
-
-      }
+    if (token1Power > token2Toughness && token1Trample) {
+      // If any trample at all would happen, then the weight is increases
+      weight += 1;
+    } else if ((token1Power <= token2Toughness) && token1Trample) {
+      // If the defender prevents trample from happening, then the weight is reduced
+      weight -= 1;
     }
+    if ((token1Power > token2Toughness && token2Indestructible)) {
+      // If the defender can keep a token from dying on their side, then the weight is also reduced
+      weight -= 1;
+    }
+    if (token1Deathtouch && !token2Indestructible) {
+      // If the defender would lose a token, then the weight is increased
+      weight += 1;
+    }
+    if ((token1Power >= token2Toughness) && !token2Indestructible) {
+      // Again, if the defense would lose a token, then the weight is increased
+      weight += 1;
+    }
+    if (!token1Indestructible && (token2Deathtouch || token2Power >= token1Toughness)) {
+      // If the attacker can be killed, then the weight is reduced
+      weight -= 1;
+    }
+    return weight;
   }
 }
 
@@ -471,37 +467,6 @@ function createCalculator() {
 function computeBattle (tokensFirstPlayer, tokensSecondPlayer) {
   let copyFirstTokens = tokensFirstPlayer;
   let copySecondTokens = tokensSecondPlayer;
-  // for (let token of copyFirstTokens) {
-  //   const tokenAttributes = token.getAttributes();
-  //   const tokenPower = tokenAttributes[0];
-  //   const tokenToughness = tokenAttributes[1];
-  //   const tokenTapped = tokenAttributes[2];
-  //   const tokenDeathtouch = token.deathtouch;
-  //   const tokenIndestructible = token.indestructible;
-  //   const tokenDoubleStrike = token.doubleStrike;
-  //   const tokenVigilance = token.vigilance;
-  //   const tokenFlying = token.flying;
-  //   const tokenReach = token.reach;
-  //   for (let token2 of copySecondTokens) {
-  //     const token2Attributes = token.getAttributes();
-  //     const token2Power = tokenAttributes[0];
-  //     const token2Toughness = tokenAttributes[1];
-  //     const token2Tapped = tokenAttributes[2];
-  //     const token2Deathtouch = token.deathtouch;
-  //     const token2Indestructible = token.indestructible;
-  //     const token2DoubleStrike = token.doubleStrike;
-  //     const token2Vigilance = token.vigilance;
-  //     const token2Flying = token.flying;
-  //     const token2Reach = token.reach;
-  //     if (tokenFlying && tokenReach) {
-
-  //     } else if (!tokenFlying) {
-
-  //     } else {
-
-  //     }
-  //   }
-  // }
 }
 
 function calculate () {
